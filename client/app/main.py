@@ -240,6 +240,7 @@ class PyAPI:
             try:
                 self.client.post(
                     f"{self._relay}/v1/messages/{e['msg_id']}/ack",
+                    params={"device_id": me},
                     headers=self._auth_header(me),
                 )
             except Exception:

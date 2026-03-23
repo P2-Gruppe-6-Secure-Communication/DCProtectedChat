@@ -191,7 +191,7 @@ async def post_message(
 def poll(
     request: Request,
     device_id: str,
-    limit: int = 50,
+    limit: int = Query(50, ge=1, le=200),
     authorization: Optional[str] = Header(default=None),
     db: Session = Depends(get_db),
 ):
@@ -226,15 +226,19 @@ def poll(
 def ack(
     request: Request,
     msg_id: str,
+    device_id: str,
     authorization: Optional[str] = Header(default=None),
     db: Session = Depends(get_db),
 ):
-    stmt = select(MessageQueue).where(MessageQueue.msg_id == msg_id)
+    # Verify auth before touching the DB to avoid leaking message existence
+    _verify_device_auth(device_id, authorization, db)
+    stmt = select(MessageQueue).where(
+        MessageQueue.msg_id == msg_id,
+        MessageQueue.to_device_id == device_id,
+    )
     row = db.execute(stmt).scalar_one_or_none()
     if row is None:
         return {"ok": True, "deleted": False}
-    # Verify the recipient owns this message before deleting
-    _verify_device_auth(row.to_device_id, authorization, db)
     db.delete(row)
     db.commit()
     return {"ok": True, "deleted": True}
@@ -370,8 +374,8 @@ async def websocket_endpoint(
     if kb is None:
         await ws.close(code=4403)
         return
-    if kb.device_secret_hash and token:
-        if not secrets.compare_digest(_hash_secret(token), kb.device_secret_hash):
+    if kb.device_secret_hash:
+        if not token or not secrets.compare_digest(_hash_secret(token), kb.device_secret_hash):
             await ws.close(code=4403)
             return
 
@@ -407,9 +411,12 @@ async def websocket_endpoint(
         while True:
             data = await ws.receive_json()
             if data.get("type") == "ack" and "msg_id" in data:
-                stmt = select(MessageQueue).where(MessageQueue.msg_id == data["msg_id"])
+                stmt = select(MessageQueue).where(
+                    MessageQueue.msg_id == data["msg_id"],
+                    MessageQueue.to_device_id == device_id,
+                )
                 row = db.execute(stmt).scalar_one_or_none()
-                if row and row.to_device_id == device_id:
+                if row:
                     db.delete(row)
                     db.commit()
     except WebSocketDisconnect:

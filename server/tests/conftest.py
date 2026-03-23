@@ -31,7 +31,7 @@ _db_module.engine = _TEST_ENGINE
 _db_module.SessionLocal = _TestSession
 
 from app.models import Base
-from app.main import app, get_db
+from app.main import app, get_db, limiter
 
 
 @pytest.fixture(autouse=True)
@@ -42,8 +42,16 @@ def fresh_db():
     Base.metadata.drop_all(bind=_TEST_ENGINE)
 
 
+@pytest.fixture(autouse=True)
+def disable_rate_limits():
+    """Disable slowapi rate limiting for all tests."""
+    limiter.enabled = False
+    yield
+    limiter.enabled = True
+
+
 @pytest.fixture
-def client(fresh_db):
+def client(fresh_db, disable_rate_limits):
     def _override_get_db():
         db = _TestSession()
         try:
