@@ -22,9 +22,9 @@ _server_root = str(Path(__file__).resolve().parents[1])
 if _server_root not in sys.path:
     sys.path.insert(0, _server_root)
 
-from .db import SessionLocal, engine
-from .models import MessageQueue, KeyBundle, OneTimePrekey, Base
-from .schemas import EnvelopeIn, EnvelopeOut, SendResponse, KeyBundleIn, KeyBundleOut, OpkEntry
+from .db import SessionLocal, engine  # noqa: E402
+from .models import MessageQueue, KeyBundle, OneTimePrekey, Base  # noqa: E402
+from .schemas import EnvelopeIn, EnvelopeOut, SendResponse, KeyBundleIn, KeyBundleOut, OpkEntry  # noqa: E402
 
 
 # ── WebSocket connection manager ──────────────────────────────────────────────
