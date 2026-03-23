@@ -24,7 +24,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
-import uuid
 
 from kyber_py.kyber import Kyber1024
 import nacl.bindings
@@ -33,7 +32,6 @@ import nacl.signing
 
 from .keys import (
     ik_dh_private,
-    ik_sign_private,
     spk_private,
     pqspk_private_bytes,
     get_opk_private,

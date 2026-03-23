@@ -27,7 +27,6 @@ import httpx
 from .keys import (
     build_bundle,
     load_or_generate_identity,
-    ik_sign_private,
     spk_private,
     save_identity,
     get_device_secret,
