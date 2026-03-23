@@ -18,6 +18,7 @@ class KeyBundleIn(BaseModel):
     pqspk_pub: str            # base64 Kyber1024 public key
     pqspk_sig: str            # base64 Ed25519 signature of pqspk_pub
     opk_pubs: list[OpkEntry]  # batch of one-time prekeys to upload
+    device_secret: Optional[str] = None  # random secret for auth; stored as SHA-256 hash
 
 
 class KeyBundleOut(BaseModel):

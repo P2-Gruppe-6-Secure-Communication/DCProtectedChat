@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  server-tests:
+    name: Server tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: p2
+          POSTGRES_PASSWORD: p2password
+          POSTGRES_DB: p2chat
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      P2_DB_USER: p2
+      P2_DB_PASS: p2password
+      P2_DB_HOST: 127.0.0.1
+      P2_DB_PORT: "5432"
+      P2_DB_NAME: p2chat
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install server dependencies
+        working-directory: server
+        run: pip install poetry && poetry install --no-root
+
+      - name: Lint
+        working-directory: server
+        run: poetry run ruff check app/
+
+      - name: Run migrations
+        working-directory: server
+        run: poetry run alembic upgrade head
+
+      - name: Run tests
+        working-directory: server
+        run: poetry run pytest tests/ -v
+
+  client-tests:
+    name: Client crypto tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install client dependencies
+        working-directory: client
+        run: pip install poetry && poetry install --no-root
+
+      - name: Lint
+        working-directory: client
+        run: poetry run ruff check app/
+
+      - name: Run tests
+        working-directory: client
+        run: poetry run pytest tests/ -v

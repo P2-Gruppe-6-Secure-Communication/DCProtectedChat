@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import base64
 import json
+import secrets
 import uuid
 from pathlib import Path
 
@@ -108,6 +109,7 @@ def generate_identity(device_id: str, num_opks: int = 10) -> dict:
 
     identity = {
         "device_id": device_id,
+        "device_secret": secrets.token_hex(32),
         "ik_sign_priv": _b64e(bytes(ik_sign)),
         "ik_sign_pub": _b64e(bytes(ik_sign.verify_key)),
         "ik_dh_priv": _b64e(bytes(ik_dh)),
@@ -200,3 +202,8 @@ def pqspk_public_bytes(identity: dict) -> bytes:
 
 def pqspk_private_bytes(identity: dict) -> bytes:
     return _b64d(identity["pqspk_priv"])
+
+
+def get_device_secret(identity: dict) -> str:
+    """Return the device's authentication secret (hex string, 64 chars)."""
+    return identity.get("device_secret", "")

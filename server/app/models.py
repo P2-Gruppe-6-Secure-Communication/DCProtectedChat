@@ -17,6 +17,7 @@ class KeyBundle(Base):
     pqspk_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)   # UUID of PQSPK
     pqspk_pub: Mapped[Optional[str]] = mapped_column(Text, nullable=True)        # Kyber1024 pub, base64
     pqspk_sig: Mapped[Optional[str]] = mapped_column(Text, nullable=True)        # Ed25519 sig of pqspk_pub
+    device_secret_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     updated_at_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)
 
 

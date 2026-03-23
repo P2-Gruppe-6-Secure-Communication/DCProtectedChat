@@ -9,6 +9,28 @@ services:
       - "5432:5432"
     volumes:
       - p2_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U p2"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      P2_DB_HOST: db
+      P2_DB_USER: p2
+      P2_DB_PASS: p2password
+      P2_DB_NAME: p2chat
+      P2_DB_PORT: "5432"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   p2_pgdata:

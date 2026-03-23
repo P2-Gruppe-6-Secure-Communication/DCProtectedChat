@@ -14,15 +14,36 @@ from app.crypto.groups import (
 )
 
 import os
-RELAY = os.environ.get("P2_RELAY", "http://127.0.0.1:8000")
+
+# Allow relay URL override via config file or env var
+def _load_relay() -> str:
+    config_path = Path.home() / ".p2chat" / "config.json"
+    if config_path.exists():
+        try:
+            cfg = json.loads(config_path.read_text(encoding="utf-8"))
+            if cfg.get("relay"):
+                return cfg["relay"]
+        except Exception:
+            pass
+    return os.environ.get("P2_RELAY", "http://127.0.0.1:8000")
+
+RELAY = _load_relay()
 
 
 class PyAPI:
     def __init__(self):
+        self._relay = RELAY
         self.client = httpx.Client(timeout=10.0)
         self._sessions: dict[str, SessionManager] = {}
         # Track devices whose registration is still pending (avoids log spam)
         self._pending_registration: set[str] = set()
+
+    def _auth_header(self, me: str) -> dict:
+        """Return the Authorization header for the given device, if registered."""
+        session = self._sessions.get(me)
+        if session:
+            return session.auth_header()
+        return {}
 
     def register(self, me: str) -> dict:
         """Explicitly register (or re-register) a device and return status."""
@@ -36,7 +57,7 @@ class PyAPI:
         flag = Path.home() / ".p2chat" / me / ".registered"
         flag.unlink(missing_ok=True)
         try:
-            self._sessions[me] = SessionManager(me)
+            self._sessions[me] = SessionManager(me, relay=self._relay)
             return {"ok": True, "device_id": me}
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
@@ -50,7 +71,7 @@ class PyAPI:
         if me in self._sessions:
             return self._sessions[me]
         try:
-            self._sessions[me] = SessionManager(me)
+            self._sessions[me] = SessionManager(me, relay=self._relay)
             self._pending_registration.discard(me)
             return self._sessions[me]
         except Exception as exc:
@@ -84,7 +105,7 @@ class PyAPI:
             "created_at_ms": int(time.time() * 1000),
             "ttl_seconds": 7 * 24 * 3600,
         }
-        r = self.client.post(f"{RELAY}/v1/messages", json=payload)
+        r = self.client.post(f"{self._relay}/v1/messages", json=payload, headers=self._auth_header(me))
         r.raise_for_status()
         return r.json()
 
@@ -155,7 +176,7 @@ class PyAPI:
                 "group_meta": json.dumps({"name": group["name"], "members": group["members"]}),
             }
             try:
-                r = self.client.post(f"{RELAY}/v1/messages", json=payload)
+                r = self.client.post(f"{self._relay}/v1/messages", json=payload, headers=self._auth_header(me))
                 r.raise_for_status()
                 sent += 1
             except Exception as exc:
@@ -170,7 +191,11 @@ class PyAPI:
         # Never raise to JavaScript — all errors are printed to the Python
         # console and the UI simply gets an empty list, retrying in 800 ms.
         try:
-            r = self.client.get(f"{RELAY}/v1/messages/poll", params={"device_id": me})
+            r = self.client.get(
+                f"{self._relay}/v1/messages/poll",
+                params={"device_id": me},
+                headers=self._auth_header(me),
+            )
             r.raise_for_status()
             envelopes = r.json()
         except Exception as exc:
@@ -213,7 +238,10 @@ class PyAPI:
                 "group_meta": e.get("group_meta"),
             })
             try:
-                self.client.post(f"{RELAY}/v1/messages/{e['msg_id']}/ack")
+                self.client.post(
+                    f"{self._relay}/v1/messages/{e['msg_id']}/ack",
+                    headers=self._auth_header(me),
+                )
             except Exception:
                 pass  # non-critical; message will be re-delivered on next poll
         return out

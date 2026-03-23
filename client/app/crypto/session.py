@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -29,6 +30,7 @@ from .keys import (
     ik_sign_private,
     spk_private,
     save_identity,
+    get_device_secret,
 )
 from .x3dh import initiate, accept
 from .ratchet import (
@@ -40,7 +42,9 @@ from .ratchet import (
 )
 
 _DATA_ROOT = Path.home() / ".p2chat"
-_RELAY = "http://127.0.0.1:8000"
+_DEFAULT_RELAY = "http://127.0.0.1:8000"
+_OPK_LOW_THRESHOLD = 5
+_OPK_REPLENISH_COUNT = 10
 
 
 def _b64e(data: bytes) -> str:
@@ -56,10 +60,24 @@ def _b64d(s: str) -> bytes:
 # ---------------------------------------------------------------------------
 
 class SessionManager:
-    def __init__(self, device_id: str) -> None:
+    def __init__(self, device_id: str, relay: str | None = None) -> None:
         self.device_id = device_id
+        self._relay = relay or os.environ.get("P2_RELAY", _DEFAULT_RELAY)
         self._identity = load_or_generate_identity(device_id)
         self._ensure_registered()
+
+    # ------------------------------------------------------------------
+    # Auth helpers
+    # ------------------------------------------------------------------
+
+    def _device_secret(self) -> str:
+        return get_device_secret(self._identity)
+
+    def auth_header(self) -> dict[str, str]:
+        secret = self._device_secret()
+        if secret:
+            return {"Authorization": f"Bearer {secret}"}
+        return {}
 
     # ------------------------------------------------------------------
     # Registration
@@ -71,13 +89,68 @@ class SessionManager:
         if flag.exists():
             return
         self._upload_bundle()
+        self._check_and_replenish_opks()
         flag.parent.mkdir(parents=True, exist_ok=True)
         flag.touch()
 
     def _upload_bundle(self) -> None:
         bundle = build_bundle(self._identity)
-        resp = httpx.post(f"{_RELAY}/v1/keys/{self.device_id}", json=bundle)
+        bundle["device_secret"] = self._device_secret()
+        resp = httpx.post(
+            f"{self._relay}/v1/keys/{self.device_id}",
+            json=bundle,
+            headers=self.auth_header(),
+        )
         resp.raise_for_status()
+
+    # ------------------------------------------------------------------
+    # OPK replenishment
+    # ------------------------------------------------------------------
+
+    def _check_and_replenish_opks(self) -> None:
+        """Upload fresh OPKs to the server when the pool runs low."""
+        try:
+            resp = httpx.get(
+                f"{self._relay}/v1/keys/{self.device_id}/opk-count",
+                headers=self.auth_header(),
+            )
+            if resp.status_code != 200:
+                return
+            count = resp.json().get("count", _OPK_LOW_THRESHOLD)
+            if count >= _OPK_LOW_THRESHOLD:
+                return
+        except Exception:
+            return
+
+        # Generate and upload new OPKs
+        import nacl.public
+        import uuid
+        new_opks: dict[str, dict] = {}
+        for _ in range(_OPK_REPLENISH_COUNT):
+            opk = nacl.public.PrivateKey.generate()
+            opk_id = str(uuid.uuid4())
+            new_opks[opk_id] = {
+                "priv": _b64e(bytes(opk)),
+                "pub": _b64e(bytes(opk.public_key)),
+            }
+
+        self._identity.setdefault("opks", {}).update(new_opks)
+        save_identity(self.device_id, self._identity)
+
+        opk_pubs = [{"opk_id": k, "opk_pub": v["pub"]} for k, v in new_opks.items()]
+        try:
+            resp = httpx.post(
+                f"{self._relay}/v1/keys/{self.device_id}",
+                json={
+                    **build_bundle(self._identity),
+                    "device_secret": self._device_secret(),
+                    "opk_pubs": opk_pubs,
+                },
+                headers=self.auth_header(),
+            )
+            resp.raise_for_status()
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Session persistence
@@ -153,6 +226,8 @@ class SessionManager:
             my_spk = spk_private(self._identity)
             state = init_receiver(sk, my_spk)
             dr_header = header["dr"]
+            # OPK was consumed — check if we need to replenish
+            self._check_and_replenish_opks()
         elif header.get("type") == "dr":
             if state is None:
                 raise ValueError(f"No session found for peer {peer_id!r} but received DR message")
@@ -169,6 +244,6 @@ class SessionManager:
     # ------------------------------------------------------------------
 
     def _fetch_bundle(self, peer_id: str) -> dict:
-        resp = httpx.get(f"{_RELAY}/v1/keys/{peer_id}")
+        resp = httpx.get(f"{self._relay}/v1/keys/{peer_id}")
         resp.raise_for_status()
         return resp.json()

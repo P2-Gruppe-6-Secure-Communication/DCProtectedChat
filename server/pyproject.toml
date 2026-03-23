@@ -1,9 +1,9 @@
 [project]
 name = "server"
 version = "0.1.0"
-description = ""
+description = "P2 Relay Server"
 authors = [
-    {name = "Your Name",email = "you@example.com"}
+    {name = "P2-Gruppe-6", email = "team@example.com"}
 ]
 requires-python = ">=3.12,<4.0"
 
@@ -14,7 +14,8 @@ dependencies = [
     "sqlalchemy (>=2.0.46,<3.0.0)",
     "alembic (>=1.18.4,<2.0.0)",
     "psycopg[binary] (>=3.3.3,<4.0.0)",
-    "p2shared @ file:///C:/Users/frede/p2-secure-groupchat/shared"
+    "slowapi (>=0.1.9,<0.2.0)",
+    "websockets (>=13.0,<17.0)",
 ]
 
 
@@ -25,5 +26,7 @@ build-backend = "poetry.core.masonry.api"
 [dependency-groups]
 dev = [
     "pytest (>=9.0.2,<10.0.0)",
-    "ruff (>=0.15.2,<0.16.0)"
+    "pytest-asyncio (>=0.24.0,<1.0.0)",
+    "httpx (>=0.28.0,<0.29.0)",
+    "ruff (>=0.15.2,<0.16.0)",
 ]
