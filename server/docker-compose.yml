@@ -1,0 +1,14 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: p2
+      POSTGRES_PASSWORD: p2password
+      POSTGRES_DB: p2chat
+    ports:
+      - "5432:5432"
+    volumes:
+      - p2_pgdata:/var/lib/postgresql/data
+
+volumes:
+  p2_pgdata:

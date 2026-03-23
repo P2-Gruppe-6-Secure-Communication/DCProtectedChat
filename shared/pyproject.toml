@@ -1,0 +1,13 @@
+[tool.poetry]
+name = "p2shared"
+version = "0.1.0"
+description = "Shared types for P2 secure group chat"
+authors = ["P2 Team"]
+packages = [{ include = "p2shared" }]
+
+[tool.poetry.dependencies]
+python = ">=3.12,<4.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

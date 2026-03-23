@@ -1,0 +1,629 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>P2 Chat</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1C1C1E;
+      color: #EBEBF5;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    #header {
+      background: #2C2C2E;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #3A3A3C;
+      flex-shrink: 0;
+    }
+    #header-left { display: flex; align-items: center; gap: 8px; }
+    #header h1 { font-size: 16px; font-weight: 600; color: #FFFFFF; }
+    #header-right { display: flex; align-items: center; gap: 8px; }
+    #status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #FF453A; transition: background 0.4s;
+    }
+    #status-dot.connected { background: #30D158; }
+    #device-label { font-size: 13px; color: #EBEBF599; }
+
+    /* ── Identity bar ── */
+    #identity-bar {
+      background: #2C2C2E;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid #3A3A3C;
+      flex-shrink: 0;
+    }
+    #identity-bar label { font-size: 12px; color: #EBEBF566; white-space: nowrap; }
+    #identity-bar input {
+      background: #3A3A3C; border: none; border-radius: 6px;
+      padding: 5px 10px; color: #EBEBF5; font-size: 13px; outline: none; width: 120px;
+    }
+    #identity-bar input:focus { background: #48484A; }
+    #register-btn {
+      background: #0A84FF; border: none; border-radius: 6px;
+      padding: 5px 12px; color: white; font-size: 13px; cursor: pointer; font-weight: 500;
+    }
+    #register-btn:hover { background: #0071E3; }
+    #register-btn:disabled { background: #3A3A3C; cursor: default; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; top: 72px; left: 50%; transform: translateX(-50%);
+      background: #48484A; color: #EBEBF5; padding: 8px 18px;
+      border-radius: 20px; font-size: 13px; opacity: 0;
+      transition: opacity 0.3s; pointer-events: none; z-index: 100;
+    }
+    #toast.visible { opacity: 1; }
+
+    /* ── Main body ── */
+    #main-body {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      width: 220px;
+      background: #2C2C2E;
+      border-right: 1px solid #3A3A3C;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    #sidebar-header {
+      padding: 10px 12px 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #3A3A3C;
+    }
+    #sidebar-header span {
+      font-size: 11px; font-weight: 600; color: #EBEBF566;
+      letter-spacing: 0.5px; text-transform: uppercase;
+    }
+    #new-group-btn {
+      background: none; border: none; color: #0A84FF;
+      font-size: 22px; line-height: 1; cursor: pointer; padding: 0 2px;
+    }
+    #new-group-btn:hover { color: #0071E3; }
+
+    #conv-list {
+      flex: 1; overflow-y: auto; padding: 4px 0;
+    }
+    #conv-list::-webkit-scrollbar { width: 4px; }
+    #conv-list::-webkit-scrollbar-thumb { background: #3A3A3C; border-radius: 2px; }
+
+    .conv-item {
+      padding: 8px 10px; cursor: pointer; border-radius: 8px;
+      margin: 1px 6px; display: flex; align-items: center; gap: 8px; min-width: 0;
+    }
+    .conv-item:hover { background: #3A3A3C; }
+    .conv-item.active { background: #0A84FF22; }
+    .conv-icon {
+      width: 28px; height: 28px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 600; flex-shrink: 0;
+      background: #48484A; color: #EBEBF5;
+    }
+    .conv-icon.group { background: #30D15822; color: #30D158; }
+    .conv-name {
+      font-size: 13px; color: #EBEBF5;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    #new-direct-area {
+      padding: 8px; border-top: 1px solid #3A3A3C; display: flex; gap: 6px;
+    }
+    #new-direct-input {
+      flex: 1; background: #3A3A3C; border: none; border-radius: 6px;
+      padding: 6px 8px; color: #EBEBF5; font-size: 12px; outline: none;
+    }
+    #new-direct-input:focus { background: #48484A; }
+    #new-direct-input::placeholder { color: #EBEBF544; }
+    #new-direct-go {
+      background: #0A84FF; border: none; border-radius: 6px;
+      color: white; font-size: 14px; padding: 0 8px; cursor: pointer;
+    }
+    #new-direct-go:hover { background: #0071E3; }
+
+    /* ── Chat pane ── */
+    #chat-pane {
+      flex: 1; display: flex; flex-direction: column; overflow: hidden;
+    }
+    #chat-title-bar {
+      background: #2C2C2E; padding: 8px 16px;
+      border-bottom: 1px solid #3A3A3C; flex-shrink: 0;
+    }
+    #chat-title-name { font-size: 14px; font-weight: 600; color: #EBEBF5; }
+    #chat-title-sub  { font-size: 11px; font-weight: 400; color: #EBEBF566; margin-top: 1px; }
+
+    /* ── Chat area ── */
+    #chat {
+      flex: 1; overflow-y: auto; padding: 16px;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    #chat::-webkit-scrollbar { width: 4px; }
+    #chat::-webkit-scrollbar-track { background: transparent; }
+    #chat::-webkit-scrollbar-thumb { background: #3A3A3C; border-radius: 2px; }
+
+    .msg-row { display: flex; flex-direction: column; margin: 3px 0; }
+    .msg-row.sent { align-items: flex-end; }
+    .msg-row.recv { align-items: flex-start; }
+    .sender-name { font-size: 11px; color: #0A84FF; margin-bottom: 2px; padding: 0 4px; }
+    .bubble {
+      max-width: 65%; padding: 8px 13px; border-radius: 18px;
+      font-size: 14px; line-height: 1.45; word-break: break-word;
+    }
+    .sent .bubble { background: #0A84FF; color: #fff; border-bottom-right-radius: 4px; }
+    .recv .bubble { background: #3A3A3C; color: #EBEBF5; border-bottom-left-radius: 4px; }
+    .bubble.error  { background: #3A1C1C; color: #FF6961; font-size: 12px; font-style: italic; }
+    .msg-time { font-size: 11px; color: #EBEBF544; margin-top: 3px; padding: 0 4px; }
+    .system-msg {
+      text-align: center; font-size: 11px; color: #EBEBF544; margin: 8px 0;
+    }
+    #empty-state {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      color: #EBEBF533; font-size: 14px;
+    }
+
+    /* ── Input bar ── */
+    #input-bar {
+      background: #2C2C2E; padding: 10px 16px;
+      display: flex; align-items: center; gap: 8px;
+      border-top: 1px solid #3A3A3C; flex-shrink: 0;
+    }
+    #text {
+      flex: 1; background: #3A3A3C; border: none; border-radius: 20px;
+      padding: 8px 16px; color: #EBEBF5; font-size: 14px; outline: none;
+    }
+    #text:focus { background: #48484A; }
+    #text::placeholder { color: #EBEBF544; }
+    #send-btn {
+      background: #0A84FF; border: none; border-radius: 50%;
+      width: 36px; height: 36px; display: flex; align-items: center;
+      justify-content: center; cursor: pointer; flex-shrink: 0;
+      color: white; font-size: 18px;
+    }
+    #send-btn:hover  { background: #0071E3; }
+    #send-btn:active { transform: scale(0.93); }
+    #send-btn:disabled { background: #3A3A3C; cursor: default; }
+
+    /* ── New group modal ── */
+    #modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6); z-index: 200;
+      align-items: center; justify-content: center;
+    }
+    #modal-overlay.visible { display: flex; }
+    #modal {
+      background: #2C2C2E; border: 1px solid #3A3A3C;
+      border-radius: 14px; padding: 24px; width: 320px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    #modal h2 { font-size: 16px; font-weight: 600; color: #FFFFFF; }
+    #modal label { font-size: 12px; color: #EBEBF566; display: block; margin-bottom: 4px; }
+    #modal input {
+      width: 100%; background: #3A3A3C; border: none; border-radius: 8px;
+      padding: 8px 12px; color: #EBEBF5; font-size: 13px; outline: none;
+    }
+    #modal input:focus { background: #48484A; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .modal-btn {
+      border: none; border-radius: 8px; padding: 7px 16px;
+      font-size: 13px; cursor: pointer; font-weight: 500;
+    }
+    .modal-btn.cancel  { background: #3A3A3C; color: #EBEBF5; }
+    .modal-btn.cancel:hover  { background: #48484A; }
+    .modal-btn.confirm { background: #0A84FF; color: white; }
+    .modal-btn.confirm:hover { background: #0071E3; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div id="header">
+    <div id="header-left">
+      <span>&#128274;</span>
+      <h1>P2 Chat</h1>
+    </div>
+    <div id="header-right">
+      <div id="status-dot"></div>
+      <span id="device-label">Not registered</span>
+    </div>
+  </div>
+
+  <!-- Identity bar -->
+  <div id="identity-bar">
+    <label>My ID:</label>
+    <input id="me" value="deviceA" placeholder="device ID" />
+    <button id="register-btn" onclick="register()">Register</button>
+  </div>
+
+  <div id="toast"></div>
+
+  <!-- Two-column body -->
+  <div id="main-body">
+
+    <!-- Sidebar -->
+    <div id="sidebar">
+      <div id="sidebar-header">
+        <span>Conversations</span>
+        <button id="new-group-btn" title="New group" onclick="openNewGroupModal()">+</button>
+      </div>
+
+      <div id="conv-list"></div>
+
+      <div id="new-direct-area">
+        <input id="new-direct-input" placeholder="Device ID…"
+               onkeydown="if(event.key==='Enter')openDirect()" />
+        <button id="new-direct-go" onclick="openDirect()">&#9658;</button>
+      </div>
+    </div>
+
+    <!-- Chat pane -->
+    <div id="chat-pane">
+      <div id="chat-title-bar">
+        <div id="chat-title-name" style="color:#EBEBF533;">Select a conversation</div>
+        <div id="chat-title-sub"></div>
+      </div>
+
+      <div id="chat">
+        <div id="empty-state">No conversation selected</div>
+      </div>
+
+      <div id="input-bar">
+        <input id="text" placeholder="Message…"
+               onkeydown="if(event.key==='Enter')send()" />
+        <button id="send-btn" onclick="send()" disabled>&#9658;</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- New group modal -->
+  <div id="modal-overlay">
+    <div id="modal">
+      <h2>New Group</h2>
+      <div>
+        <label>Group name</label>
+        <input id="modal-name" placeholder="e.g. Study Group" />
+      </div>
+      <div>
+        <label>Members (comma-separated device IDs)</label>
+        <input id="modal-members" placeholder="alice, bob, carol" />
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn cancel" onclick="closeNewGroupModal()">Cancel</button>
+        <button class="modal-btn confirm" onclick="confirmNewGroup()">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── State ────────────────────────────────────────
+    let activeChat = null; // {type:"direct"|"group", id, name}
+    const messageHistory = new Map(); // "direct:id" | "group:id" → [{direction,from,text,isError,time}]
+    const groupsMap = new Map();      // groupId → groupDict
+    const directChats = new Set();    // deviceId
+
+    function chatKey(type, id)  { return `${type}:${id}`; }
+    function historyFor(type, id) {
+      const k = chatKey(type, id);
+      if (!messageHistory.has(k)) messageHistory.set(k, []);
+      return messageHistory.get(k);
+    }
+
+    // ── Utilities ────────────────────────────────────
+    function nowTime() {
+      const d = new Date();
+      return d.getHours().toString().padStart(2,"0") + ":" +
+             d.getMinutes().toString().padStart(2,"0");
+    }
+
+    function showToast(msg, ms = 2500) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.classList.add("visible");
+      clearTimeout(showToast._tid);
+      showToast._tid = setTimeout(() => t.classList.remove("visible"), ms);
+    }
+
+    // ── Sidebar ──────────────────────────────────────
+    function renderSidebar() {
+      const list = document.getElementById("conv-list");
+      list.innerHTML = "";
+
+      for (const [gid, g] of groupsMap) {
+        const item = document.createElement("div");
+        item.className = "conv-item" +
+          (activeChat && activeChat.type === "group" && activeChat.id === gid ? " active" : "");
+        item.onclick = () => selectGroup(gid);
+
+        const icon = document.createElement("div");
+        icon.className = "conv-icon group";
+        icon.textContent = "#";
+
+        const name = document.createElement("div");
+        name.className = "conv-name";
+        name.textContent = g.name;
+
+        item.appendChild(icon);
+        item.appendChild(name);
+        list.appendChild(item);
+      }
+
+      for (const did of directChats) {
+        const item = document.createElement("div");
+        item.className = "conv-item" +
+          (activeChat && activeChat.type === "direct" && activeChat.id === did ? " active" : "");
+        item.onclick = () => selectDirect(did);
+
+        const icon = document.createElement("div");
+        icon.className = "conv-icon";
+        icon.textContent = did[0].toUpperCase();
+
+        const name = document.createElement("div");
+        name.className = "conv-name";
+        name.textContent = did;
+
+        item.appendChild(icon);
+        item.appendChild(name);
+        list.appendChild(item);
+      }
+    }
+
+    // ── Conversation selection ────────────────────────
+    function selectDirect(deviceId) {
+      directChats.add(deviceId);
+      activeChat = { type: "direct", id: deviceId, name: deviceId };
+      document.getElementById("chat-title-name").textContent = deviceId;
+      document.getElementById("chat-title-name").style.color = "";
+      document.getElementById("chat-title-sub").textContent = "Direct · end-to-end encrypted";
+      document.getElementById("send-btn").disabled = false;
+      renderSidebar();
+      renderChat();
+    }
+
+    function selectGroup(groupId) {
+      const g = groupsMap.get(groupId);
+      if (!g) return;
+      activeChat = { type: "group", id: groupId, name: g.name };
+      document.getElementById("chat-title-name").textContent = g.name;
+      document.getElementById("chat-title-name").style.color = "";
+      document.getElementById("chat-title-sub").textContent =
+        "Group · " + g.members.join(", ");
+      document.getElementById("send-btn").disabled = false;
+      renderSidebar();
+      renderChat();
+    }
+
+    // ── Chat rendering ────────────────────────────────
+    function renderChat() {
+      const chat = document.getElementById("chat");
+      const es = document.getElementById("empty-state");
+      if (es) es.remove();
+      chat.innerHTML = "";
+      if (!activeChat) return;
+      for (const m of historyFor(activeChat.type, activeChat.id)) {
+        _appendBubble(m.direction, m.from, m.text, m.isError, m.time);
+      }
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function _appendBubble(direction, from, text, isError, time) {
+      const chat = document.getElementById("chat");
+      const row  = document.createElement("div");
+      row.className = "msg-row " + direction;
+
+      if (direction === "recv") {
+        const nameEl = document.createElement("div");
+        nameEl.className = "sender-name";
+        nameEl.textContent = from;
+        row.appendChild(nameEl);
+      }
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble" + (isError ? " error" : "");
+      bubble.textContent = text;
+      row.appendChild(bubble);
+
+      const timeEl = document.createElement("div");
+      timeEl.className = "msg-time";
+      timeEl.textContent = time || nowTime();
+      row.appendChild(timeEl);
+
+      chat.appendChild(row);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function addMessageToHistory(type, id, direction, from, text, isError) {
+      const entry = { direction, from, text, isError: !!isError, time: nowTime() };
+      historyFor(type, id).push(entry);
+      if (activeChat && activeChat.type === type && activeChat.id === id) {
+        _appendBubble(direction, from, text, isError, entry.time);
+      }
+    }
+
+    function addSystem(text) {
+      const chat = document.getElementById("chat");
+      const div  = document.createElement("div");
+      div.className = "system-msg";
+      div.textContent = text;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    // ── Open direct chat ──────────────────────────────
+    function openDirect() {
+      const input = document.getElementById("new-direct-input");
+      const did   = input.value.trim();
+      if (!did) return;
+      input.value = "";
+      selectDirect(did);
+    }
+
+    // ── Registration ──────────────────────────────────
+    async function register() {
+      const me  = document.getElementById("me").value.trim();
+      if (!me) { showToast("Enter a device ID first"); return; }
+      const btn = document.getElementById("register-btn");
+      btn.disabled = true;
+      btn.textContent = "…";
+      try {
+        const res = await window.pywebview.api.register(me);
+        if (res.ok) {
+          document.getElementById("device-label").textContent = res.device_id;
+          document.getElementById("status-dot").classList.add("connected");
+          addSystem("Registered as \"" + res.device_id + "\" — end-to-end encrypted");
+          showToast("Registered as " + res.device_id);
+          await loadGroups();
+        } else {
+          showToast("Registration failed: " + res.error);
+        }
+      } catch (e) {
+        showToast("Error: " + e);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Register";
+      }
+    }
+
+    // ── Load groups ───────────────────────────────────
+    async function loadGroups() {
+      const me = document.getElementById("me").value.trim();
+      if (!me) return;
+      try {
+        const groups = await window.pywebview.api.get_groups(me);
+        groupsMap.clear();
+        for (const g of groups) groupsMap.set(g.group_id, g);
+        renderSidebar();
+      } catch (e) {
+        console.error("loadGroups:", e);
+      }
+    }
+
+    // ── New group modal ───────────────────────────────
+    function openNewGroupModal() {
+      document.getElementById("modal-name").value    = "";
+      document.getElementById("modal-members").value = "";
+      document.getElementById("modal-overlay").classList.add("visible");
+      document.getElementById("modal-name").focus();
+    }
+    function closeNewGroupModal() {
+      document.getElementById("modal-overlay").classList.remove("visible");
+    }
+    document.getElementById("modal-overlay").addEventListener("click", function(e) {
+      if (e.target === this) closeNewGroupModal();
+    });
+
+    async function confirmNewGroup() {
+      const me      = document.getElementById("me").value.trim();
+      const name    = document.getElementById("modal-name").value.trim();
+      const members = document.getElementById("modal-members").value.trim();
+      if (!me)      { showToast("Register first"); return; }
+      if (!name)    { showToast("Enter a group name"); return; }
+      if (!members) { showToast("Enter at least one member"); return; }
+      closeNewGroupModal();
+      try {
+        const res = await window.pywebview.api.create_group(me, name, members);
+        if (res.ok) {
+          groupsMap.set(res.group.group_id, res.group);
+          showToast("Group \"" + res.group.name + "\" created");
+          renderSidebar();
+          selectGroup(res.group.group_id);
+        } else {
+          showToast("Failed: " + res.error);
+        }
+      } catch(e) {
+        showToast("Error: " + e);
+      }
+    }
+
+    // ── Send ──────────────────────────────────────────
+    async function send() {
+      if (!activeChat) return;
+      const me   = document.getElementById("me").value.trim();
+      const text = document.getElementById("text").value.trim();
+      if (!text) return;
+      document.getElementById("text").value = "";
+
+      addMessageToHistory(activeChat.type, activeChat.id, "sent", me, text, false);
+
+      if (activeChat.type === "direct") {
+        try {
+          const res = await window.pywebview.api.send_message(me, activeChat.id, text);
+          if (res && res.error) addSystem("Send failed: " + res.error);
+        } catch (e) { addSystem("Send error: " + e); }
+      } else {
+        try {
+          const res = await window.pywebview.api.send_group_message(me, activeChat.id, text);
+          if (res && !res.ok) {
+            addSystem("Group send failed: " + res.error);
+          } else if (res && res.warnings && res.warnings.length) {
+            addSystem("Partial send — unreachable: " + res.warnings.join("; "));
+          }
+        } catch (e) { addSystem("Group send error: " + e); }
+      }
+    }
+
+    // ── Poll ──────────────────────────────────────────
+    async function poll() {
+      const me = document.getElementById("me").value.trim();
+      let delay = 800;
+      try {
+        const msgs = await window.pywebview.api.poll(me);
+        document.getElementById("status-dot").classList.add("connected");
+
+        let newGroup = false;
+        for (const m of msgs) {
+          const isError = m.plaintext && m.plaintext.startsWith("[decryption error");
+          if (m.group_id) {
+            if (!groupsMap.has(m.group_id)) {
+              newGroup = true;
+            }
+            addMessageToHistory("group", m.group_id, "recv", m.from, m.plaintext, isError);
+          } else {
+            if (!directChats.has(m.from)) {
+              directChats.add(m.from);
+              renderSidebar();
+            }
+            addMessageToHistory("direct", m.from, "recv", m.from, m.plaintext, isError);
+          }
+        }
+        if (newGroup) await loadGroups();
+        poll._lastErr = null;
+      } catch (e) {
+        if (poll._lastErr !== String(e)) poll._lastErr = String(e);
+        document.getElementById("status-dot").classList.remove("connected");
+        delay = 3000;
+      }
+      setTimeout(poll, delay);
+    }
+
+    // ── Startup ───────────────────────────────────────
+    async function init() {
+      await loadGroups();
+      poll();
+    }
+
+    if (window.pywebview) { init(); }
+    else { window.addEventListener("pywebviewready", init); }
+  </script>
+
+</body>
+</html>
