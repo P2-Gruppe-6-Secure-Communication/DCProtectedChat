@@ -81,12 +81,20 @@ def test_build_bundle_excludes_private_keys(tmp_path, monkeypatch):
 
 # ── X3DH ─────────────────────────────────────────────────────────────────────
 
+def _server_bundle(identity: dict) -> dict:
+    """Simulate the server's KeyBundleOut response (single 'opk', not 'opk_pubs' list)."""
+    b = build_bundle(identity)
+    opk_pubs = b.pop("opk_pubs", [])
+    b["opk"] = opk_pubs[0] if opk_pubs else None
+    return b
+
+
 def test_x3dh_shared_secret_matches(tmp_path, monkeypatch):
     monkeypatch.setattr("app.crypto.keys._DATA_ROOT", tmp_path)
 
     alice = generate_identity("alice")
     bob = generate_identity("bob")
-    bob_bundle = build_bundle(bob)
+    bob_bundle = _server_bundle(bob)
 
     # Alice initiates
     sk_alice, x3dh_header = initiate(alice, bob_bundle)
@@ -102,7 +110,7 @@ def test_x3dh_header_type(tmp_path, monkeypatch):
     monkeypatch.setattr("app.crypto.keys._DATA_ROOT", tmp_path)
     alice = generate_identity("alice")
     bob = generate_identity("bob")
-    _, header = initiate(alice, build_bundle(bob))
+    _, header = initiate(alice, _server_bundle(bob))
     assert header["type"] == "x3dh_init"
 
 
@@ -111,7 +119,7 @@ def test_x3dh_opk_consumed_after_accept(tmp_path, monkeypatch):
     alice = generate_identity("alice")
     bob = generate_identity("bob")
 
-    bob_bundle = build_bundle(bob)
+    bob_bundle = _server_bundle(bob)
     opk_id = bob_bundle["opk"]["opk_id"] if bob_bundle.get("opk") else None
 
     if opk_id:
@@ -128,7 +136,7 @@ def _setup_ratchet_pair(tmp_path, monkeypatch):
     monkeypatch.setattr("app.crypto.keys._DATA_ROOT", tmp_path)
     alice = generate_identity("alice")
     bob = generate_identity("bob")
-    bob_bundle = build_bundle(bob)
+    bob_bundle = _server_bundle(bob)
 
     sk, _ = initiate(alice, bob_bundle)
 

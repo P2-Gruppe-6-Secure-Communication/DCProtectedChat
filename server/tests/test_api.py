@@ -181,6 +181,6 @@ def test_ack_deletes_message(client):
 
 def test_ack_idempotent(client):
     r = client.post("/v1/messages/nonexistent-id/ack", headers=_auth())
-    # Returns 403 because device_id can't be looked up from a missing message
-    # (expected — security is more important than convenience here)
-    assert r.status_code in (200, 403)
+    # Returns 200 with deleted=False when message doesn't exist (no auth check needed)
+    assert r.status_code == 200
+    assert r.json()["deleted"] is False
