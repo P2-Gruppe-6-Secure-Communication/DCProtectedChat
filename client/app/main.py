@@ -25,7 +25,7 @@ def _load_relay() -> str:
                 return cfg["relay"]
         except Exception:
             pass
-    return os.environ.get("P2_RELAY", "http://127.0.0.1:8000")
+    return os.environ.get("P2_RELAY", "https://p2chat-server.onrender.com")
 
 RELAY = _load_relay()
 
@@ -251,7 +251,13 @@ class PyAPI:
 def main():
     api = PyAPI()
 
-    client_root = Path(__file__).resolve().parents[1]   # .../client
+    # When frozen by PyInstaller, bundled files are in sys._MEIPASS.
+    # When running from source, they're relative to the client root.
+    import sys
+    if hasattr(sys, "_MEIPASS"):
+        client_root = Path(sys._MEIPASS)
+    else:
+        client_root = Path(__file__).resolve().parents[1]
     ui_file = client_root / "ui" / "index.html"
 
     if not ui_file.exists():
