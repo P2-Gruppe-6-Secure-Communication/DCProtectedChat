@@ -7,7 +7,9 @@ from sqlalchemy.orm import sessionmaker, DeclarativeBase
 # postgresql+psycopg://, so we normalise it here.
 _DATABASE_URL = os.getenv("DATABASE_URL")
 if _DATABASE_URL:
-    # Normalise Render's legacy scheme
+    # Normalise Render's URL to use psycopg3 driver.
+    # Render may supply either "postgres://" or "postgresql://" — handle both.
+    _DATABASE_URL = _DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
     _DATABASE_URL = _DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)
 else:
     DB_USER = os.getenv("P2_DB_USER", "p2")
