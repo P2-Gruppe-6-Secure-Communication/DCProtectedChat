@@ -21,6 +21,7 @@ poetry run pyinstaller ^
   --collect-all "kyber_py" ^
   --collect-all "nacl" ^
   --collect-all "webview" ^
+  --collect-all "certifi" ^
   --windowed ^
   app\main.py
 

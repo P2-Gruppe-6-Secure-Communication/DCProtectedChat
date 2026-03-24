@@ -1,3 +1,12 @@
+import sys
+import os
+
+# When frozen by PyInstaller, point SSL to the bundled certifi CA bundle.
+if hasattr(sys, "_MEIPASS"):
+    _cert = os.path.join(sys._MEIPASS, "certifi", "cacert.pem")
+    os.environ["SSL_CERT_FILE"] = _cert
+    os.environ["REQUESTS_CA_BUNDLE"] = _cert
+
 from pathlib import Path
 import json
 import time
